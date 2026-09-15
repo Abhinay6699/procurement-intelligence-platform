@@ -12,6 +12,39 @@ An AI-driven procurement leakage detection platform designed to identify, flag, 
 
 ## System Architecture & Machine Learning Methodology
 
+```mermaid
+graph TD
+    %% Data Layer
+    subgraph Data Layer
+        GEN[Synthetic Data Generator] --> CSV[(Raw CSVs: Vendors, POs, Invoices...)]
+        CSV --> DB[(SQLite Database)]
+    end
+
+    %% ML Engine
+    subgraph ML Engine
+        DB --> HEUR[Rule-Based Heuristics]
+        DB --> ISO[Isolation Forest Anomaly Det.]
+        HEUR --> XGB[XGBoost Meta-Classifier]
+        ISO --> XGB
+        XGB --> SHAP[SHAP Explainability]
+        SHAP --> MODELS[(Saved Models .pkl)]
+    end
+
+    %% Backend API
+    subgraph Backend FastAPI
+        MODELS --> API_ANALYZE[Analysis Endpoints]
+        DB --> API_DASH[Dashboard Endpoints]
+        DB --> API_UPLOAD[Data Ingestion Endpoints]
+    end
+
+    %% Frontend & AI Agent
+    subgraph Client Layer
+        API_ANALYZE --> AGENT[AI Procurement Agent]
+        API_DASH --> UI[Web Dashboard]
+        AGENT --> UI
+    end
+```
+
 The platform operates on a robust, multi-stage detection pipeline:
 
 ### 1. Synthetic Data Generation (`ml/generate_data.py`)
