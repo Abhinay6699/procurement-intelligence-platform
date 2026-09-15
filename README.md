@@ -1,38 +1,31 @@
 # Procurement Intelligence Platform (MVP)
 
-An AI-driven procurement leakage detection platform designed to identify, flag, and explain anomalies and non-compliant purchasing behavior. The platform processes purchase orders, contracts, invoices, and payments to detect five specific categories of procurement leakage.
+An AI-driven procurement leakage detection platform designed to identify, flag, and explain anomalies and non-compliant purchasing behavior.
 
-## Core Leakage Categories Detected
+## Initial Architecture & Vision
 
-1. **Maverick Spend**: Purchases made without an active contract or from unapproved vendors, exposing the organization to un-negotiated rates and supplier risk.
-2. **Contract Price Leakage**: Discrepancies where the invoiced amount exceeds the contract's negotiated rate.
-3. **Duplicate Invoices**: Identical or near-identical invoices (handling fuzzy tax/rounding differences) submitted for the same purchase.
-4. **Split Purchase Orders (Split POs)**: Instances where a single large purchase is artificially split into smaller consecutive POs to bypass managerial approval thresholds.
-5. **Payment Leakage (Missed Discounts)**: Invoices that are paid late, resulting in the forfeiture of early-payment discounts.
-
-## System Architecture & Machine Learning Methodology
+The platform was designed from the ground up to operate as a full-stack AI application with a robust machine learning backend. The complete planned architecture is:
 
 ```mermaid
 graph TD
     %% Data Layer
     subgraph Data Layer
-        GEN[Synthetic Data Generator] --> CSV[(Raw CSVs: Vendors, POs, Invoices...)]
+        GEN[Synthetic Data Generator] --> CSV[(Raw CSVs)]
         CSV --> DB[(SQLite Database)]
     end
 
     %% ML Engine
     subgraph ML Engine
         DB --> HEUR[Rule-Based Heuristics]
-        DB --> ISO[Isolation Forest Anomaly Det.]
-        HEUR --> XGB[XGBoost Meta-Classifier]
+        DB --> ISO[Isolation Forest]
+        HEUR --> XGB[XGBoost Classifier]
         ISO --> XGB
-        XGB --> SHAP[SHAP Explainability]
-        SHAP --> MODELS[(Saved Models .pkl)]
+        XGB --> SHAP[SHAP Explainer]
     end
 
     %% Backend API
     subgraph Backend FastAPI
-        MODELS --> API_ANALYZE[Analysis Endpoints]
+        SHAP --> API_ANALYZE[Analysis Endpoints]
         DB --> API_DASH[Dashboard Endpoints]
         DB --> API_UPLOAD[Data Ingestion Endpoints]
     end
@@ -45,54 +38,33 @@ graph TD
     end
 ```
 
-The platform operates on a robust, multi-stage detection pipeline:
+## What We Have Done Until Now
 
-### 1. Synthetic Data Generation (`ml/generate_data.py`)
-To rigorously test the system, we generate realistic procurement data containing both "Easy" and "Hard" leakage cases. 
-- **Hard Cases** force the model to distinguish between legitimate edge-cases (e.g., a legitimate $90 one-off purchase from an approved vendor without a contract) and actual leakage (e.g., a $200 purchase from an unapproved vendor).
-- The generator creates deterministic relationships across Vendors, Contracts, POs, Invoices, and Payments.
+We have approached the MVP build in structured phases. So far, **Phases 1 through 3 are complete**.
 
-### 2. Rule-Based Heuristic Detectors (`ml/detectors.py`)
-Each leakage category has a dedicated heuristic detector that parses the raw transactional data and extracts highly engineered features (e.g., `price_variance_pct`, `is_fuzzy_duplicate`, `split_po_cluster_size`, `is_approved_vendor`). It also includes an `IsolationForest` to generate a global `anomaly_score`.
+### Phase 1: Data Ingestion & Backend Setup
+We established the foundational data layer and backend server.
+- Built a FastAPI backend (`backend/main.py`) with SQLAlchemy ORM models connecting to a SQLite database.
+- Created data ingestion endpoints to process CSV uploads for Vendors, Contracts, Purchase Orders, Invoices, and Payments.
+- Verified that relationships (e.g., POs linking to Vendors and Invoices) enforce data integrity.
 
-### 3. XGBoost Meta-Classifier Ensemble (`ml/ensemble.py`)
-Rather than relying purely on static rules, an XGBoost ensemble model ingest the features extracted by the heuristics. 
-- **Explainability**: The model leverages **SHAP (SHapley Additive exPlanations)** to generate reason codes for every flagged transaction. Instead of a black-box "Anomaly Detected," the system can explicitly state: *"Flagged due to a 5.6% price variance above negotiated contract rate."*
+### Phase 2: Heuristics & Anomaly Detection
+We implemented the mathematical rules and statistical models required to detect 5 distinct categories of procurement leakage:
+1. **Contract Price Leakage**: Invoices exceeding negotiated contract rates.
+2. **Duplicate Invoices**: Flagging identical or near-identical invoices using fuzzy matching.
+3. **Split Purchase Orders (Split POs)**: Detecting large purchases artificially split to bypass approval thresholds.
+4. **Maverick Spend**: Flagging off-contract purchases from unapproved vendors.
+5. **Payment Leakage**: Identifying missed early-payment discounts.
+- Also added an `IsolationForest` model to detect multivariate global anomalies across all transactions.
 
-## Current Project Status: Phase 3 Complete
+### Phase 3: Machine Learning & "Hard Edge Case" Hardening (Just Completed)
+We moved beyond simple rules by implementing a meta-classifier and thoroughly stress-testing it.
+- **Synthetic Data Generation**: We built a custom generator (`ml/generate_data.py`) to create highly realistic "Hard Edge Cases" (e.g., a legitimate $90 purchase without a contract vs. an actual $250 maverick spend).
+- **XGBoost Ensemble**: We trained an XGBoost classifier (`ml/ensemble.py`) that ingests the outputs of all heuristics and the anomaly score to make a final prediction.
+- **SHAP Explainability**: Implemented SHAP to extract reason codes so the model can explain *why* it flagged a transaction (e.g., "Flagged due to a 5.6% price variance").
+- **Rigorous Evaluation**: We debugged and refined the detectors (fixing tolerance bands for duplicate invoices and correcting vendor approval logic for maverick spend). The final pipeline achieves an **F1-Score of 0.98+**, successfully distinguishing between legitimate edge-cases and actual leakage with high precision (>84% on the hardest cases).
 
-We have successfully completed **Phase 3: ML Detection Engine & Evaluation**. 
-- The pipeline was rigorously evaluated against a synthetic dataset of ~2,000 transactions.
-- We achieved an overall F1-Score of **0.98+**.
-- Hard edge cases for Maverick Spend and Split POs maintain high precision (0.84 - 0.93), proving the detectors successfully isolate leakage without being fooled by legitimate but similar-looking transactions.
-
-## Next Steps: Phase 4 (Agent Integration)
-
-We are actively transitioning into **Phase 4**. The immediate next steps are:
-1. **API Layer**: Wrap the trained XGBoost model and heuristic logic into FastAPI endpoints (`backend/routers/analyze.py`).
-2. **AI Agent**: Build a conversational agent (utilizing LLMs) that can query these endpoints, read the SHAP reason codes, and summarize the findings to a procurement officer in natural language.
-3. **Dashboard UI**: Develop the frontend interface for end-users to interact with the platform.
-
-## Project Structure
-
-```text
-├── backend/                  # FastAPI backend server
-│   ├── routers/              # API Endpoints (auth, analyze, dashboard, reports, etc.)
-│   ├── database.py           # Database connection and session management
-│   ├── models.py             # SQLAlchemy ORM models
-│   ├── schemas.py            # Pydantic schemas for data validation
-│   └── main.py               # Application entry point
-├── ml/                       # Machine Learning Pipeline
-│   ├── generate_data.py      # Synthetic data generator
-│   ├── detectors.py          # Rule-based heuristics and IsolationForest
-│   ├── ensemble.py           # XGBoost classifier and SHAP integration
-│   ├── train_models.py       # Orchestration script to run pipeline and train
-│   ├── evaluate.py           # Evaluation script generating Precision/Recall metrics
-│   └── saved_models/         # Serialized pickle files of the trained ensemble
-├── data/                     
-│   └── synthetic/            # Generated CSVs (Vendors, Contracts, POs, Invoices, Payments)
-├── tests/                    # Pytest test suite
-├── .gitignore                
-├── requirements.txt          
-└── README.md                 
-```
+## Next Steps (Phase 4)
+With the ML engine fully trained and validated, we are ready to move to **Phase 4: Agent Integration**.
+- We will wrap the trained XGBoost model and SHAP explainer into the FastAPI backend.
+- We will build the AI Agent layer that will interact with these endpoints to explain procurement leakage to end-users in natural language.
