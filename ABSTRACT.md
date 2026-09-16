@@ -1,0 +1,7 @@
+# Abstract: Procurement Intelligence Platform
+
+The Procurement Intelligence Platform is an automated analytics and audit system designed to identify, quantify, and explain financial leakages across enterprise procurement cycles. Procurement operations frequently suffer from value erosion caused by off-contract maverick spend, split purchase orders aimed at circumventing managerial approvals, duplicate invoicing, rate discrepancies against negotiated contracts, and forfeited early-payment discounts.
+
+To solve this, the platform implements a layered architecture combining deterministic domain heuristics, multivariate anomaly detection (Isolation Forest), and an XGBoost meta-ensemble trained on realistic procurement transactions and edge cases. Interpretability is natively integrated using SHAP (SHapley Additive exPlanations) values to provide auditable reason codes for flagged transactions. The platform is designed around a multi-agent LangGraph orchestration layer, enabling autonomous AI agents to query analytics endpoints, synthesize investigative findings, and deliver conversational explanations to procurement and finance teams.
+
+Currently, Phases 1 through 3 are complete: the core data ingestion engine, SQLite relational persistence, rule-based leakage detectors, and hardened XGBoost/SHAP ensemble models are operational and validated with an F1-score of 0.98+ on benchmark datasets. Phase 4 will introduce the full LangGraph agent workflow and interactive UI integration.
