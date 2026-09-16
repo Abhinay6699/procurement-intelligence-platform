@@ -8,9 +8,11 @@ from typing import Optional
 from .. import models, schemas
 from ..database import get_db
 
-SECRET_KEY = "your-secret-key-for-development-only"
+import os
+
+SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-for-development-only")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
